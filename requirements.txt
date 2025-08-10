@@ -1,0 +1,5 @@
+flask
+beautifulsoup4
+aioschedule
+python-telegram-bot
+sendgrid

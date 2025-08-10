@@ -212,4 +212,4 @@ if __name__ == '__main__':
         loop.run_until_complete(run_scheduler())
     scheduler_thread = Thread(target=run_scheduler_in_thread, daemon=True)
     scheduler_thread.start()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

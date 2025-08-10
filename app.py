@@ -203,8 +203,13 @@ def index():
 if __name__ == '__main__':
     print(f"Запуск скрипта: xAI_Marker_v1aa_20250807_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     init_db()
-    # Выполним обновление данных один раз при запуске
     update_listings()
-    loop = asyncio.get_event_loop()
-    asyncio.ensure_future(run_scheduler())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    # Запускаем планировщик в фоновом потоке
+    from threading import Thread
+    def run_scheduler_in_thread():
+        loop.run_until_complete(run_scheduler())
+    scheduler_thread = Thread(target=run_scheduler_in_thread, daemon=True)
+    scheduler_thread.start()
     app.run(debug=True)

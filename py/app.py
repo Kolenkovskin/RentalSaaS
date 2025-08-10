@@ -1,4 +1,6 @@
-# app.py
+from dotenv import load_dotenv
+import os
+load_dotenv()  # Загружает переменные из .env
 import asyncio
 from flask import Flask, jsonify, request, render_template
 import sqlite3
@@ -9,16 +11,19 @@ from telegram.error import TelegramError
 from bs4 import BeautifulSoup
 import sendgrid
 from sendgrid.helpers.mail import Mail
+import os
 
 app = Flask(__name__, template_folder='C:\\Users\\User\\PycharmProjects\\RentalSaaS\\templates')
 
 # Настройки Telegram
-TELEGRAM_TOKEN = '8036857233:AAEtKNmUzytmUcbHHF0Vt9V2Hfoa8Gs_TV8'
-CHAT_ID = '5141864033'
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8036857233:AAEtKNmUzytmUcbHHF0Vt9V2Hfoa8Gs_TV8")
+CHAT_ID = os.getenv("CHAT_ID", "5141864033")
 bot = Bot(TELEGRAM_TOKEN)
 
 # Настройки SendGrid
-SENDGRID_API_KEY = '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'
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+if not SENDGRID_API_KEY:
+    raise ValueError("SENDGRID_API_KEY is not set in environment variables")
 
 # xAI_Marker_v1p_20250809_1630
 def send_notification(recipient_email):

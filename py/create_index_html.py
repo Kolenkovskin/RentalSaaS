@@ -1,0 +1,182 @@
+import os
+
+# Путь к файлу
+file_path = r"C:\Users\User\PycharmProjects\RentalSaaS\templates\index.html"
+
+# Удаление файла, если он существует
+if os.path.exists(file_path):
+    try:
+        os.remove(file_path)
+        print(f"Файл {file_path} успешно удален.")
+    except Exception as e:
+        print(f"Ошибка при удалении файла: {e}")
+else:
+    print(f"Файл {file_path} не найден.")
+
+# Создание папки templates, если она отсутствует
+templates_dir = os.path.dirname(file_path)
+if not os.path.exists(templates_dir):
+    try:
+        os.makedirs(templates_dir)
+        print(f"Папка {templates_dir} успешно создана.")
+    except Exception as e:
+        print(f"Ошибка при создании папки: {e}")
+
+# Создание нового файла с нужным кодом
+new_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rental SaaS - Tallinn Rentals</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        #listingsList {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        #priceChart {
+            height: 400px !important;
+            max-width: 100%;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            overflow-x: auto;
+        }
+        .chart-ticks {
+            font-size: 10px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Rental SaaS - Tallinn Rentals</h1>
+        
+        <h2>Rental Listings</h2>
+        <div id="listingsList" class="list-group mb-4">
+            <!-- Listings will be loaded here -->
+        </div>
+
+        <h2>Book a Listing</h2>
+        <form id="bookingForm">
+            <div class="form-group">
+                <label for="listingId">Listing ID:</label>
+                <input type="number" class="form-control" id="listingId" required>
+            </div>
+            <div class="form-group">
+                <label for="userId">User ID:</label>
+                <input type="text" class="form-control" id="userId" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Book</button>
+        </form>
+        <div id="bookingResult" class="mt-3" style="display: none;"></div>
+
+        <h2>Price Analytics</h2>
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+    // Загрузка списка объявлений
+    async function loadListings() {
+        const response = await fetch('/listings');
+        const listings = await response.json();
+        const listingsList = document.getElementById('listingsList');
+        listingsList.innerHTML = '';
+        listings.forEach(listing => {
+            const item = document.createElement('a');
+            item.classList.add('list-group-item', 'list-group-item-action');
+            item.href = listing.link;
+            item.target = '_blank';
+            item.textContent = `ID: ${listing.id}, Price: ${listing.price}€, Location: ${listing.location}, Area: ${listing.area} m², Rooms: ${listing.rooms}, Add Time: ${listing.add_time || 'N/A'}`;
+            listingsList.appendChild(item);
+        });
+    }
+
+    // Загрузка аналитики и рендеринг графика
+    async function loadAnalytics() {
+        const response = await fetch('/analytics');
+        const analytics = await response.json();
+        const locations = analytics.map(item => item.location);
+        const prices = analytics.map(item => item.avg_price_per_m2 || 0);
+
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: locations,
+                datasets: [{
+                    label: 'Average Price per m² (€)',
+                    data: prices,
+                    backgroundColor: '#4BC0C0',
+                    borderColor: '#36A2EB',
+                    borderWidth: 1,
+                    barPercentage: 0.5,
+                    categoryPercentage: 0.6
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    },
+                    x: {
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    // Обработка бронирования
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const listingId = document.getElementById('listingId').value;
+        const userId = document.getElementById('userId').value;
+        const response = await fetch('/booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ listing_id: parseInt(listingId), user_id: userId })
+        });
+        const result = await response.json();
+        const resultDiv = document.getElementById('bookingResult');
+        resultDiv.textContent = JSON.stringify(result);
+        resultDiv.style.display = 'block';
+        if (response.ok) {
+            resultDiv.className = 'mt-3 alert alert-success';
+        } else {
+            resultDiv.className = 'mt-3 alert alert-danger';
+        }
+    });
+
+    // Загрузка данных при старте
+    window.onload = () => {
+        loadListings();
+        loadAnalytics();
+        document.getElementById('bookingResult').style.display = 'none';
+    };
+</script>
+</body>
+</html>
+"""
+
+try:
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write(new_content)
+    print(f"Файл {file_path} успешно создан заново.")
+except Exception as e:
+    print(f"Ошибка при создании файла: {e}")

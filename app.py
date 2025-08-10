@@ -13,7 +13,8 @@ import sendgrid
 from sendgrid.helpers.mail import Mail
 import os
 
-app = Flask(__name__, template_folder='C:\\Users\\User\\PycharmProjects\\RentalSaaS\\templates')
+
+app = Flask(__name__, template_folder='templates')
 
 # Настройки Telegram
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8036857233:AAEtKNmUzytmUcbHHF0Vt9V2Hfoa8Gs_TV8")
@@ -39,7 +40,7 @@ def send_notification(recipient_email):
 
 # Инициализация БД
 def init_db():
-    conn = sqlite3.connect('rentals.db')
+    conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS listings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,12 +111,12 @@ def parse_kv_ee(html_content):
 # Обновление данных из локального HTML-файла
 def update_listings():
     try:
-        conn = sqlite3.connect('rentals.db')
+        conn = sqlite3.connect('py/rentals.db')
         c = conn.cursor()
         # Очистка таблицы перед обновлением
         c.execute("DELETE FROM listings")
         conn.commit()
-        with open('C:\\Users\\User\\PycharmProjects\\RentalSaaS\\HtmlCodeKv.txt', 'r', encoding='utf-8') as file:
+        with open('HtmlCodeKv.txt', 'r', encoding='utf-8') as file:
             html_content = file.read()
         listings = parse_kv_ee(html_content)
         for listing in listings:
@@ -153,7 +154,7 @@ async def run_scheduler():
 # Эндпоинты API
 @app.route('/listings', methods=['GET'])
 def get_listings():
-    conn = sqlite3.connect('rentals.db')
+    conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
     c.execute("SELECT * FROM listings")
     listings = [{'id': row[0], 'price': row[1], 'location': row[2], 'area': row[3], 'rooms': row[4], 'add_time': row[5], 'link': row[6]} for row in c.fetchall()]
@@ -163,7 +164,7 @@ def get_listings():
 
 @app.route('/analytics', methods=['GET'])
 def get_analytics():
-    conn = sqlite3.connect('rentals.db')
+    conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
     c.execute("SELECT location, AVG(price/area) as avg_price_per_m2 FROM listings WHERE price > 2 GROUP BY location HAVING avg_price_per_m2 IS NOT NULL AND avg_price_per_m2 > 0")
     analytics = [{'location': row[0], 'avg_price_per_m2': row[1]} for row in c.fetchall()]
@@ -178,7 +179,7 @@ async def create_booking():
     user_id = data.get('user_id')
     if not listing_id or not user_id:
         return jsonify({'error': 'Missing required fields'}), 400
-    conn = sqlite3.connect('rentals.db')
+    conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
     c.execute("INSERT INTO bookings (listing_id, user_id, booked_at) VALUES (?, ?, ?)",
               (listing_id, user_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))

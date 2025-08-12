@@ -146,10 +146,10 @@ async def send_telegram_notification(chat_id, message):
 
 # Асинхронный планировщик
 async def run_scheduler():
-    schedule.every().day.at("02:00").do(update_listings)
+    schedule.every().day.at("02:00").do(update_listings)  # Запуск раз в день
     while True:
         await schedule.run_pending()
-        await asyncio.sleep(60)
+        await asyncio.sleep(3600)  # Пауза 1 час вместо 60 секунд
 
 # Эндпоинты API
 @app.route('/listings', methods=['GET'])

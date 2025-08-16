@@ -40,7 +40,7 @@ def send_notification(recipient_email, message):
         print(f"SendGrid error: {str(e)}")
 
 def init_db():
-    conn = sqlite3.connect('py/rentals.db')
+    conn = sqlite3.connect('/data/rentals.db')
     c = conn.cursor()
     c.execute('''DROP TABLE IF EXISTS listings''')  # Удаляем таблицу, если существует
     c.execute('''CREATE TABLE listings (
@@ -108,7 +108,7 @@ def parse_kv_ee(html_content):
 
 def update_listings():
     try:
-        conn = sqlite3.connect('py/rentals.db')
+        conn = sqlite3.connect('/data/rentals.db')
         c = conn.cursor()
         c.execute("DELETE FROM listings")
         conn.commit()
@@ -191,14 +191,16 @@ def create_booking():
     conn.close()
     return jsonify({'message': 'Booking created'}), 201
 
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
+init_db()  # Создаём таблицы при запуске
+update_listings()  # Обновляем данные при запуске
+
 if __name__ == '__main__':
     print(f"Запуск скрипта: xAI_Marker_v1aa_20250807_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    init_db()  # Создаём таблицы
-    update_listings()  # Заполняем данными
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     def run_scheduler_in_thread():

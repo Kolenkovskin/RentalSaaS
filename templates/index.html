@@ -25,6 +25,17 @@
         .chart-ticks {
             font-size: 10px !important;
         }
+        .listing-item {
+            display: flex;
+            align-items: center;
+        }
+        .listing-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .button-group {
+            display: flex;
+            gap: 5px; /* Минимальный отступ между кнопками */
+        }
     </style>
 </head>
 <body>
@@ -33,22 +44,23 @@
         
         <h2>Rental Listings</h2>
         <div id="listingsList" class="list-group mb-4">
-            <!-- Listings will be loaded here -->
+            <!-- Listings will be loaded here with checkboxes -->
         </div>
-
-        <a href="https://kolenkovskin.gumroad.com/l/rental-saas" class="btn btn-primary mt-3">Subscribe 6,49€/month</a>
 
         <h2>Book a Listing</h2>
         <form id="bookingForm">
             <div class="form-group">
-                <label for="listingId">Listing ID:</label>
-                <input type="number" class="form-control" id="listingId" required>
+                <label for="phoneNumber">Your phone number:</label>
+                <input type="tel" class="form-control" id="phoneNumber" required>
             </div>
             <div class="form-group">
-                <label for="userId">User ID:</label>
-                <input type="text" class="form-control" id="userId" required>
+                <label for="email">Your email:</label>
+                <input type="email" class="form-control" id="email" required>
             </div>
-            <button type="submit" class="btn btn-primary">Book</button>
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">Book</button>
+                <a href="https://kolenkovskin.gumroad.com/l/rental-saas" class="btn btn-primary">Subscribe</a>
+            </div>
         </form>
         <div id="bookingResult" class="mt-3" style="display: none;"></div>
 
@@ -59,18 +71,19 @@
     </div>
 
     <script>
-    // Загрузка списка объявлений
+    // Загрузка списка объявлений с чекбоксами
     async function loadListings() {
         const response = await fetch('/listings');
         const listings = await response.json();
         const listingsList = document.getElementById('listingsList');
         listingsList.innerHTML = '';
         listings.forEach(listing => {
-            const item = document.createElement('a');
-            item.classList.add('list-group-item', 'list-group-item-action');
-            item.href = listing.link;
-            item.target = '_blank';
-            item.textContent = `ID: ${listing.id}, Price: ${listing.price}€, Location: ${listing.location}, Area: ${listing.area} m², Rooms: ${listing.rooms}, Add Time: ${listing.add_time || 'N/A'}`;
+            const item = document.createElement('div');
+            item.classList.add('list-group-item', 'listing-item');
+            item.innerHTML = `
+                <input type="checkbox" name="listingId" value="${listing.id}">
+                ID: ${listing.id}, Price: ${listing.price}€, Location: ${listing.location}, Area: ${listing.area} m², Rooms: ${listing.rooms}, Add Time: ${listing.add_time || 'N/A'}, <a href="${listing.link}" target="_blank">Link</a>
+            `;
             listingsList.appendChild(item);
         });
     }
@@ -122,12 +135,18 @@
     // Обработка бронирования
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const listingId = document.getElementById('listingId').value;
-        const userId = document.getElementById('userId').value;
+        const phoneNumber = document.getElementById('phoneNumber').value;
+        const email = document.getElementById('email').value;
+        const selectedListing = document.querySelector('input[name="listingId"]:checked');
+        if (!selectedListing) {
+            alert('Please select a listing to book.');
+            return;
+        }
+        const listingId = parseInt(selectedListing.value);
         const response = await fetch('/booking', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ listing_id: parseInt(listingId), user_id: userId })
+            body: JSON.stringify({ listing_id: listingId, phone_number: phoneNumber, email: email })
         });
         const result = await response.json();
         const resultDiv = document.getElementById('bookingResult');
@@ -146,6 +165,6 @@
         loadAnalytics();
         document.getElementById('bookingResult').style.display = 'none';
     };
-</script>
+    </script>
 </body>
 </html>

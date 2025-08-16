@@ -11,8 +11,7 @@ from telegram.error import TelegramError
 from bs4 import BeautifulSoup
 import sendgrid
 from sendgrid.helpers.mail import Mail
-import os
-
+from threading import Thread
 
 app = Flask(__name__, template_folder='templates')
 
@@ -26,23 +25,25 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 if not SENDGRID_API_KEY:
     raise ValueError("SENDGRID_API_KEY is not set in environment variables")
 
-# xAI_Marker_v1p_20250809_1630
-def send_notification(recipient_email):
-    sg = sendgrid.SendGridAPIClient(SENDGRID_API_KEY)
-    message = Mail(
-        from_email='kolenkovskin@hotmail.com',  # Убедитесь, что этот email верифицирован в SendGrid
-        to_emails=recipient_email,
-        subject='Тест уведомления',
-        html_content='Новое бронирование!'
-    )
-    response = sg.send(message)
-    print(f"SendGrid status: {response.status_code}")
+def send_notification(recipient_email, message):
+    try:
+        sg = sendgrid.SendGridAPIClient(SENDGRID_API_KEY)
+        message_obj = Mail(
+            from_email='kolenkovskin@hotmail.com',
+            to_emails=recipient_email,
+            subject='Новое бронирование',
+            html_content=message
+        )
+        response = sg.send(message_obj)
+        print(f"SendGrid status: {response.status_code}, Body: {response.body}")
+    except Exception as e:
+        print(f"SendGrid error: {str(e)}")
 
-# Инициализация БД
 def init_db():
     conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS listings (
+    c.execute('''DROP TABLE IF EXISTS listings''')  # Удаляем таблицу, если существует
+    c.execute('''CREATE TABLE listings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         price REAL,
         location TEXT,
@@ -51,69 +52,64 @@ def init_db():
         add_time TEXT,
         link TEXT UNIQUE
     )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS bookings (
+    c.execute('''DROP TABLE IF EXISTS bookings''')  # Удаляем таблицу, если существует
+    c.execute('''CREATE TABLE bookings (
         id INTEGER PRIMARY KEY,
         listing_id INTEGER,
-        user_id TEXT,
+        phone_number TEXT,
+        email TEXT,
         booked_at TEXT,
         FOREIGN KEY (listing_id) REFERENCES listings (id)
     )''')
     conn.commit()
     conn.close()
 
-# Парсинг данных из локального HTML-файла с улучшенным извлечением add_time
 def parse_kv_ee(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     listings = []
     articles = soup.find_all('article', class_=['default', 'object-type-apartment'])
     for article in articles:
+        # Проверка на неактивность по тексту
+        if article.find(text=lambda t: t and "NB! SEE KUULUTUS EI OLE AKTIIVNE!" in t):
+            continue  # Пропускаем неактивные объявления
         listing = {}
-        # Цена
         price_div = article.find('div', class_='price')
         if price_div:
             price_text = price_div.get_text(strip=True).replace('\xa0', ' ')
             listing['price'] = price_text
-        # Район
         h2_link = article.find('h2').find('a', href=True)
         if h2_link:
             location = h2_link.get_text(strip=True)
             listing['location'] = location
-        # Тип жилья
         excerpt = article.find('p', class_='object-excerpt')
         if excerpt:
             listing['type'] = excerpt.get_text(strip=True).split()[0] if excerpt.get_text(strip=True) else 'Apartment'
-        # Площадь
         area_div = article.find('div', class_='area')
         if area_div:
             area_text = area_div.get_text(strip=True).replace('\xa0', ' ')
             listing['area'] = float(area_text.split(' ')[0]) if area_text else 0.0
-        # Дата публикации (улучшенный парсинг)
-        add_time_div = article.find('div', class_=['add-time', 'object-add-time'])  # Пробуем разные классы
+        add_time_div = article.find('div', class_=['add-time', 'object-add-time'])
         if add_time_div and add_time_div.get_text(strip=True):
             add_time = add_time_div.get_text(strip=True)
             listing['add_time'] = add_time if add_time else 'N/A'
         else:
-            listing['add_time'] = 'N/A'  # Если не найдено, оставляем N/A
-        # Ссылка
+            listing['add_time'] = 'N/A'
         link = article.find('a', href=True)
         if link and 'data-skeleton' in link.attrs and link['data-skeleton'] == 'object':
             full_link = 'https://www.kv.ee' + link['href']
             listing['link'] = full_link
         else:
             listing['link'] = 'N/A'
-        # Количество комнат
         rooms_div = article.find('div', class_='rooms')
         if rooms_div:
             listing['rooms'] = int(rooms_div.get_text(strip=True).split()[0]) if rooms_div.get_text(strip=True).isdigit() else 0
         listings.append(listing)
     return listings
 
-# Обновление данных из локального HTML-файла
 def update_listings():
     try:
         conn = sqlite3.connect('py/rentals.db')
         c = conn.cursor()
-        # Очистка таблицы перед обновлением
         c.execute("DELETE FROM listings")
         conn.commit()
         with open('HtmlCodeKv.txt', 'r', encoding='utf-8') as file:
@@ -136,7 +132,6 @@ def update_listings():
     finally:
         conn.close()
 
-# Отправка Telegram-уведомления
 async def send_telegram_notification(chat_id, message):
     try:
         await bot.send_message(chat_id=chat_id, text=message)
@@ -144,14 +139,12 @@ async def send_telegram_notification(chat_id, message):
     except TelegramError as e:
         print(f"Failed to send Telegram message: {e}")
 
-# Асинхронный планировщик
 async def run_scheduler():
-    schedule.every().day.at("02:00").do(update_listings)  # Запуск раз в день
+    schedule.every().day.at("02:00").do(update_listings)
     while True:
         await schedule.run_pending()
-        await asyncio.sleep(3600)  # Пауза 1 час вместо 60 секунд
+        await asyncio.sleep(3600)
 
-# Эндпоинты API
 @app.route('/listings', methods=['GET'])
 def get_listings():
     conn = sqlite3.connect('py/rentals.db')
@@ -173,29 +166,30 @@ def get_analytics():
     return jsonify(analytics)
 
 @app.route('/booking', methods=['POST'])
-async def create_booking():
+def create_booking():
     data = request.get_json()
     listing_id = data.get('listing_id')
-    user_id = data.get('user_id')
-    if not listing_id or not user_id:
+    phone_number = data.get('phone_number')
+    email = data.get('email')
+    if not listing_id or not phone_number or not email:
         return jsonify({'error': 'Missing required fields'}), 400
     conn = sqlite3.connect('py/rentals.db')
     c = conn.cursor()
-    c.execute("INSERT INTO bookings (listing_id, user_id, booked_at) VALUES (?, ?, ?)",
-              (listing_id, user_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    c.execute("INSERT INTO bookings (listing_id, phone_number, email, booked_at) VALUES (?, ?, ?, ?)",
+              (listing_id, phone_number, email, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
     conn.commit()
-    # Отправка уведомлений
-    listing = c.execute("SELECT price, location FROM listings WHERE id = ?", (listing_id,)).fetchone()
+    listing = c.execute("SELECT price, location, link FROM listings WHERE id = ?", (listing_id,)).fetchone()
     if listing:
-        message = f"New booking for listing: Price {listing[0]}€, Location: {listing[1]} at {datetime.now()}"
-        await send_telegram_notification(CHAT_ID, message)
-        send_notification('estalpanek@gmail.com')  # Email-уведомление через SendGrid
+        kv_link = listing[2]  # Ссылка на kv.ee
+        message = f"New booking for listing: Price {listing[0]}€, Location: {listing[1]}, Link: {kv_link}, Client Phone: {phone_number}, Client Email: {email} at {datetime.now()}"
+        asyncio.run(send_telegram_notification(CHAT_ID, message))
+        send_notification('estalpanek@gmail.com', message)
+        send_notification(email, f"Ваша бронь (ID: {listing_id}) подтверждена. Свяжитесь с владельцем: {kv_link} в течение 24ч. Ваш телефон: {phone_number}")
     else:
         print(f"No listing found with id {listing_id}")
     conn.close()
     return jsonify({'message': 'Booking created'}), 201
 
-# Маршрут для главной страницы
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -206,8 +200,6 @@ if __name__ == '__main__':
     update_listings()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    # Запускаем планировщик в фоновом потоке
-    from threading import Thread
     def run_scheduler_in_thread():
         loop.run_until_complete(run_scheduler())
     scheduler_thread = Thread(target=run_scheduler_in_thread, daemon=True)

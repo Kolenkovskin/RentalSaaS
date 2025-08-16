@@ -197,8 +197,8 @@ def index():
 
 if __name__ == '__main__':
     print(f"Запуск скрипта: xAI_Marker_v1aa_20250807_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    init_db()
-    update_listings()
+    init_db()  # Создаём таблицы
+    update_listings()  # Заполняем данными
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     def run_scheduler_in_thread():

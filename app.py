@@ -151,6 +151,7 @@ def get_listings():
     c = conn.cursor()
     c.execute("SELECT * FROM listings")
     listings = [{'id': row[0], 'price': row[1], 'location': row[2], 'area': row[3], 'rooms': row[4], 'add_time': row[5], 'link': row[6]} for row in c.fetchall()]
+    print(f"DEBUG: Listings data = {listings}")  # Добавляем отладку
     print(f"Number of listings returned: {len(listings)}")
     conn.close()
     return jsonify(listings)
